@@ -1,0 +1,15 @@
+{
+  "main": [
+    "Basic3D/Basic3d.js"
+  ],
+  "local": [
+    "Basic3D/ModelLoader.js",
+    "Basic3D/Simple3dShapes.js"
+  ],
+  "library": [
+    "DomBasics.js",
+    "UITools.js",
+    "ThreeJSLoader.js"
+  ],
+  "thirdParty": []
+}

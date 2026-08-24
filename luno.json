@@ -1,0 +1,40 @@
+{
+  "name": "Basic3D",
+  "version": "1.0.0",
+  "description": "Three.js 3D viewport web app",
+  "type": "luno-web-app",
+  "mainClass": "Basic3d",
+  "entrypoint": {
+    "file": "Basic3d.js",
+    "class": "Basic3d",
+    "method": "run"
+  },
+  "main": [
+    "ModelLoader.js",
+    "Simple3dShapes.js",
+    "Basic3d.js"
+  ],
+  "library": [
+    "DomBasics.js",
+    "UITools.js",
+    "ThreeJSLoader.js"
+  ],
+  "styles": [
+    "basic3d.css"
+  ],
+  "files": [
+    "ModelLoader.js",
+    "Simple3dShapes.js"
+  ],
+  "processedCountSinceCheckpoint": 6,
+  "lastCheckpointTime": "2026-08-24T19:47:34.104Z",
+  "pendingCheckpointDescription": "Clean working tree",
+  "changedMethods": {
+    "Basic3D/Luno/app/LunoLoader.js": "2026-08-24T21:36:31.913Z",
+    "Basic3D/Luno/app/LunoDeployEngine.js": "2026-08-24T21:36:31.913Z",
+    "Basic3D/Luno/app/LunoSpaHeaderNav.js": "2026-08-24T21:36:31.913Z",
+    "Basic3D/Luno/app/LunoSpaDock.js": "2026-08-24T21:36:31.913Z",
+    "Library/index.html": "2026-08-24T21:36:31.913Z",
+    "Library/LunoLoader.js": "2026-08-24T21:36:31.913Z"
+  }
+}
