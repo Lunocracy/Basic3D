@@ -1,7 +1,7 @@
 {
   "name": "Basic3D",
   "version": "1.0.0",
-  "description": "Three.js 3D viewport web app",
+  "description": "Three.js 3D viewport sample app — drop in a .glb, tweak lighting, and build on top of it.",
   "type": "luno-web-app",
   "mainClass": "Basic3d",
   "entrypoint": {
@@ -22,19 +22,12 @@
   "styles": [
     "basic3d.css"
   ],
-  "files": [
-    "ModelLoader.js",
-    "Simple3dShapes.js"
-  ],
-  "processedCountSinceCheckpoint": 0,
-  "lastCheckpointTime": "2026-08-25T09:28:20.207Z",
-  "pendingCheckpointDescription": "Clean working tree",
+  "processedCountSinceCheckpoint": 10,
   "changedMethods": {
-    "Basic3D/Luno/app/LunoLoader.js": "2026-08-24T21:36:31.913Z",
-    "Basic3D/Luno/app/LunoDeployEngine.js": "2026-08-24T21:36:31.913Z",
-    "Basic3D/Luno/app/LunoSpaHeaderNav.js": "2026-08-24T21:36:31.913Z",
-    "Basic3D/Luno/app/LunoSpaDock.js": "2026-08-24T21:36:31.913Z",
-    "Library/index.html": "2026-08-24T21:36:31.913Z",
-    "Library/LunoLoader.js": "2026-08-24T21:36:31.913Z"
+    "Basic3D/luno.json": "2026-08-30T13:19:24.327Z",
+    "Library/ThreeJSLoader.js": "2026-08-30T18:28:04.452Z",
+    "Basic3D/Simple3dShapes.js": "2026-08-30T13:19:24.327Z",
+    "Basic3D/ModelLoader.js": "2026-08-30T13:19:24.327Z",
+    "Basic3D/Basic3d.js": "2026-08-30T18:28:04.452Z"
   }
 }

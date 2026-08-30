@@ -6,10 +6,10 @@ class Simple3dShapes {
     const THREE = app.THREE;
 
     const glossyMat = new THREE.MeshPhysicalMaterial({
-      metalness: 0.1,
-      roughness: 0.15,
-      clearcoat: 0.8,
-      clearcoatRoughness: 0.1,
+      metalness: 0.0,
+      roughness: 0.18,
+      clearcoat: 1.0,
+      clearcoatRoughness: 0.06,
       reflectivity: 0.9
     });
 

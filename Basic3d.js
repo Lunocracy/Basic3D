@@ -1,17 +1,18 @@
 class Basic3d {
-  constructor() {
-    this.app = null;
-    this.meshes = [];
-    this.grid = null;
-    this.thickLine = null;
-    this.raycastingEnabled = true;
-    this.intersected = null;
-    this.loadedModel = null;
-    this.isShiftDown = false;
-    this.paintedObjectsThisStroke = new Set();
-    this.defaultFov = 45;
-  }
 
+  constructor() {
+      this.app = null;
+      this.meshes = [];
+      this.lights = [];
+      this.grid = null;
+      this.raycastingEnabled = false;
+      this.intersected = null;
+      this.loadedModel = null;
+      this.isShiftDown = false;
+      this.paintedObjectsThisStroke = new Set();
+      this.defaultFov = 45;
+      this.environmentEnabled = false;
+    }
   getThemeColors() {
     const THREE = this.app.THREE;
     return [
@@ -25,26 +26,30 @@ class Basic3d {
   }
 
   _buildStudioLighting() {
-    const THREE = this.app.THREE;
-    const scene = this.app.scene;
+      const THREE = this.app.THREE;
+      const scene = this.app.scene;
+      this.lights = [];
 
-    const hemiLight = new THREE.HemisphereLight(0xffffff, 0x1e293b, 0.7);
-    hemiLight.position.set(0, 20, 0);
-    scene.add(hemiLight);
+      const hemiLight = new THREE.HemisphereLight(0xffffff, 0x1e293b, 0.65);
+      hemiLight.position.set(0, 20, 0);
+      scene.add(hemiLight);
+      this.lights.push(hemiLight);
 
-    const keyLight = new THREE.DirectionalLight(0xffffff, 1.2);
-    keyLight.position.set(5, 8, 5);
-    scene.add(keyLight);
+      const keyLight = new THREE.DirectionalLight(0xffffff, 1.25);
+      keyLight.position.set(5, 8, 5);
+      scene.add(keyLight);
+      this.lights.push(keyLight);
 
-    const fillLight = new THREE.DirectionalLight(0x58a6ff, 0.6);
-    fillLight.position.set(-5, 4, -3);
-    scene.add(fillLight);
+      const fillLight = new THREE.DirectionalLight(0x58a6ff, 0.55);
+      fillLight.position.set(-5, 4, -3);
+      scene.add(fillLight);
+      this.lights.push(fillLight);
 
-    const rimLight = new THREE.DirectionalLight(0x00f2fe, 0.5);
-    rimLight.position.set(0, 6, -6);
-    scene.add(rimLight);
-  }
-
+      const rimLight = new THREE.DirectionalLight(0x00f2fe, 0.45);
+      rimLight.position.set(0, 6, -6);
+      scene.add(rimLight);
+      this.lights.push(rimLight);
+    }
   _buildPrimitives() {
     const result = Simple3dShapes.buildPrimitives(this.app, this.app.scene);
     this.meshes.push(...result.meshes);
@@ -61,223 +66,238 @@ class Basic3d {
         m.material.color.copy(shuffled[i % shuffled.length]);
       }
     });
-
-    if (this.thickLine && this.thickLine.userData.locked !== true && this.thickLine.material && this.thickLine.material.color) {
-      const randomColor = colors[Math.floor(Math.random() * colors.length)];
-      this.thickLine.material.color.copy(randomColor);
-    }
   }
+
+  async _toggleEnvironment(enabled, feedbackElement) {
+      if (!this.app) return;
+
+      if (enabled) {
+        if (feedbackElement) feedbackElement.textContent = 'Loading environment map...';
+        let lastError = null;
+        for (const url of Basic3d.ENV_MAP_URLS) {
+          try {
+            await this.app.loadEnvironment(url);
+            this.environmentEnabled = true;
+
+            // Turn off direct studio lights so environment is 100% of the lighting source
+            if (Array.isArray(this.lights)) {
+              this.lights.forEach((l) => (l.visible = false));
+            }
+
+            // Boost exposure to ensure environment lighting isn't dark or washed out
+            if (this.app.renderer) {
+              this.app.renderer.toneMappingExposure = 1.35;
+            }
+
+            if (feedbackElement) feedbackElement.textContent = 'Environment reflections ON';
+            return;
+          } catch (error) {
+            lastError = error;
+          }
+        }
+        console.error('[Basic3d] Failed to load environment map', lastError);
+        if (feedbackElement) feedbackElement.textContent = 'Could not load environment map.';
+      } else {
+        this.app.clearEnvironment();
+        this.environmentEnabled = false;
+
+        // Re-enable studio lighting & restore baseline exposure
+        if (Array.isArray(this.lights)) {
+          this.lights.forEach((l) => (l.visible = true));
+        }
+        if (this.app.renderer) {
+          this.app.renderer.toneMappingExposure = 1.0;
+        }
+
+        if (feedbackElement) feedbackElement.textContent = 'Environment reflections OFF';
+      }
+    }
 
   _setupUI() {
-    const makeEl = typeof makeElement !== 'undefined' ? makeElement : (typeof LunoUIComponents !== 'undefined' ? LunoUIComponents.makeElement : null);
-    if (!makeEl) return;
+      const makeEl = typeof makeElement !== 'undefined' ? makeElement : (typeof LunoUIComponents !== 'undefined' ? LunoUIComponents.makeElement : null);
+      if (!makeEl) return;
 
-    const feedback = makeEl(
-      'div',
-      { style: { marginTop: '6px', fontSize: '11px', color: '#8b949e', fontFamily: 'monospace' } },
-      'Ready.'
-    );
+      const feedback = makeEl(
+        'div',
+        { style: { marginTop: '6px', fontSize: '11px', color: '#8b949e', fontFamily: 'monospace', wordBreak: 'break-word' } },
+        'Ready.'
+      );
 
-    const btnRandom = makeEl(
-      'button',
-      {
-        style: {
-          display: 'block',
-          width: '100%',
-          padding: '6px',
-          background: '#238636',
-          color: '#fff',
-          border: 'none',
-          borderRadius: '4px',
-          fontWeight: 'bold',
-          cursor: 'pointer',
-          fontFamily: 'monospace',
-          fontSize: '11px'
-        },
-      },
-      '🎲 Randomize Colors'
-    );
-    btnRandom.onclick = () => {
-      this._assignColorsRandomly();
-      feedback.textContent = 'Colors updated at ' + new Date().toLocaleTimeString();
-    };
-
-    const gridChk = makeEl('input', {
-      type: 'checkbox',
-      id: 'gridToggle',
-      checked: true
-    });
-    const gridLbl = makeEl(
-      'label',
-      { htmlFor: 'gridToggle', style: { marginLeft: '6px', color: '#c9d1d9', fontSize: '11px', fontFamily: 'monospace', cursor: 'pointer' } },
-      'Show Ground Grid'
-    );
-    gridChk.onchange = () => {
-      if (this.grid) this.grid.visible = gridChk.checked;
-      feedback.textContent = gridChk.checked ? 'Grid ON' : 'Grid OFF';
-    };
-    const gridDiv = makeEl(
-      'div',
-      { style: { marginTop: '6px', display: 'flex', alignItems: 'center' } },
-      [gridChk, gridLbl]
-    );
-
-    const thickLineChk = makeEl('input', {
-      type: 'checkbox',
-      id: 'thickLineToggle',
-      checked: true,
-    });
-    const thickLineLbl = makeEl(
-      'label',
-      { htmlFor: 'thickLineToggle', style: { marginLeft: '6px', color: '#c9d1d9', fontSize: '11px', fontFamily: 'monospace', cursor: 'pointer' } },
-      'Show Halo Ring'
-    );
-    thickLineChk.onchange = () => {
-      if (this.thickLine) {
-        this.thickLine.visible = thickLineChk.checked;
-        feedback.textContent = thickLineChk.checked ? 'Ring ON' : 'Ring OFF';
-      }
-    };
-    const thickLineDiv = makeEl(
-      'div',
-      { style: { marginTop: '4px', display: 'flex', alignItems: 'center' } },
-      [thickLineChk, thickLineLbl]
-    );
-
-    const raycastChk = makeEl('input', {
-      type: 'checkbox',
-      id: 'raycastToggle',
-      checked: true,
-    });
-    const raycastLbl = makeEl(
-      'label',
-      { htmlFor: 'raycastToggle', style: { marginLeft: '6px', color: '#c9d1d9', fontSize: '11px', fontFamily: 'monospace', cursor: 'pointer' } },
-      'Enable Hover & Click'
-    );
-    raycastChk.onchange = () => {
-      this.raycastingEnabled = raycastChk.checked;
-      feedback.textContent = this.raycastingEnabled ? 'Hover ON' : 'Hover OFF';
-      if (!this.raycastingEnabled && this.intersected) {
-        this._unhighlight(this.intersected);
-        this.intersected = null;
-      }
-    };
-    const raycastDiv = makeEl(
-      'div',
-      { style: { marginTop: '4px', display: 'flex', alignItems: 'center' } },
-      [raycastChk, raycastLbl]
-    );
-
-    const dropZone = makeEl(
-      'div',
-      {
-        id: 'drop-zone',
-        style: {
-          border: '1px dashed #30363d',
-          borderRadius: '6px',
-          padding: '8px',
-          textAlign: 'center',
-          marginTop: '8px',
-          color: '#8b949e',
-          fontSize: '11px',
-          fontFamily: 'monospace',
-          background: '#0d1117'
-        },
-      },
-      'Drop .glb model here'
-    );
-
-    dropZone.ondragover = (event) => {
-      event.preventDefault();
-      dropZone.style.backgroundColor = '#161b22';
-      dropZone.style.borderColor = '#00f2fe';
-    };
-    dropZone.ondragleave = () => {
-      dropZone.style.backgroundColor = '#0d1117';
-      dropZone.style.borderColor = '#30363d';
-    };
-    dropZone.ondrop = (event) => {
-      event.preventDefault();
-      dropZone.style.backgroundColor = '#0d1117';
-      dropZone.style.borderColor = '#30363d';
-      const file = event.dataTransfer.files[0];
-      if (file && file.name.toLowerCase().endsWith('.glb')) {
-        this._loadGLB(file, feedback);
-      } else {
-        feedback.textContent = 'Please drop a valid .glb file.';
-      }
-    };
-
-    const content = makeEl('div', { style: { display: 'flex', flexDirection: 'column', gap: '3px' } }, [
-      btnRandom,
-      gridDiv,
-      thickLineDiv,
-      raycastDiv,
-      dropZone,
-      feedback,
-    ]);
-
-    if (typeof UITools !== 'undefined' && typeof UITools.makeDialog === 'function') {
-      this.controlsDialog = UITools.makeDialog({
-        env: this.env,
-        title: '3D Controls',
-        contentElement: content,
-        size: [210, 240],
-        position: [14, 18],
-        onGeometryChange: (boxInstance, geometry) => {
-          if (geometry && geometry.inner) {
-            feedback.textContent = 'Size: ' + Math.round(geometry.inner.width) + ' × ' + Math.round(geometry.inner.height);
-          }
-        },
+      const fileInput = makeEl('input', {
+        type: 'file',
+        accept: '.glb,.gltf',
+        style: { display: 'none' }
       });
+      fileInput.onchange = (event) => {
+        const file = event.target.files && event.target.files[0];
+        if (file) {
+          this._loadGLB(file, feedback);
+        }
+        fileInput.value = '';
+      };
+
+      const btnRandom = makeEl(
+        'button',
+        {
+          style: {
+            display: 'block',
+            width: '100%',
+            padding: '6px',
+            background: '#238636',
+            color: '#fff',
+            border: 'none',
+            borderRadius: '4px',
+            fontWeight: 'bold',
+            cursor: 'pointer',
+            fontFamily: 'monospace',
+            fontSize: '11px'
+          },
+        },
+        '🎲 Randomize Colors'
+      );
+      btnRandom.onclick = () => {
+        this._assignColorsRandomly();
+        feedback.textContent = 'Colors updated at ' + new Date().toLocaleTimeString();
+      };
+
+      const gridChk = makeEl('input', {
+        type: 'checkbox',
+        id: 'gridToggle',
+        checked: true
+      });
+      const gridLbl = makeEl(
+        'label',
+        { htmlFor: 'gridToggle', style: { marginLeft: '6px', color: '#c9d1d9', fontSize: '11px', fontFamily: 'monospace', cursor: 'pointer' } },
+        'Show Ground Grid'
+      );
+      gridChk.onchange = () => {
+        if (this.grid) this.grid.visible = gridChk.checked;
+        feedback.textContent = gridChk.checked ? 'Grid ON' : 'Grid OFF';
+      };
+      const gridDiv = makeEl(
+        'div',
+        { style: { marginTop: '6px', display: 'flex', alignItems: 'center' } },
+        [gridChk, gridLbl]
+      );
+
+      const raycastChk = makeEl('input', {
+        type: 'checkbox',
+        id: 'raycastToggle',
+        checked: false,
+      });
+      const raycastLbl = makeEl(
+        'label',
+        { htmlFor: 'raycastToggle', style: { marginLeft: '6px', color: '#c9d1d9', fontSize: '11px', fontFamily: 'monospace', cursor: 'pointer' } },
+        'Enable Hover & Tap'
+      );
+      raycastChk.onchange = () => {
+        this.raycastingEnabled = raycastChk.checked;
+        feedback.textContent = this.raycastingEnabled ? 'Hover/Tap ON' : 'Hover/Tap OFF';
+        if (!this.raycastingEnabled && this.intersected) {
+          this._unhighlight(this.intersected);
+          this.intersected = null;
+        }
+      };
+      const raycastDiv = makeEl(
+        'div',
+        { style: { marginTop: '4px', display: 'flex', alignItems: 'center' } },
+        [raycastChk, raycastLbl]
+      );
+
+      const envChk = makeEl('input', {
+        type: 'checkbox',
+        id: 'envToggle',
+        checked: false,
+      });
+      const envLbl = makeEl(
+        'label',
+        { htmlFor: 'envToggle', style: { marginLeft: '6px', color: '#c9d1d9', fontSize: '11px', fontFamily: 'monospace', cursor: 'pointer' } },
+        'Environment Reflections'
+      );
+      envChk.onchange = () => {
+        this._toggleEnvironment(envChk.checked, feedback);
+      };
+      const envDiv = makeEl(
+        'div',
+        { style: { marginTop: '4px', display: 'flex', alignItems: 'center' } },
+        [envChk, envLbl]
+      );
+
+      const glbImportBtn = makeEl(
+        'div',
+        {
+          id: 'drop-zone',
+          title: 'Click to select or drag and drop a .glb file',
+          style: {
+            border: '1px dashed #30363d',
+            borderRadius: '6px',
+            padding: '9px 6px',
+            textAlign: 'center',
+            marginTop: '8px',
+            color: '#58a6ff',
+            fontSize: '11px',
+            fontFamily: 'monospace',
+            fontWeight: '600',
+            background: '#161b22',
+            cursor: 'pointer',
+            userSelect: 'none',
+            transition: 'all 0.15s ease'
+          },
+        },
+        '📂 Open or Drop .glb Model'
+      );
+
+      glbImportBtn.onclick = () => fileInput.click();
+
+      glbImportBtn.ondragover = (event) => {
+        event.preventDefault();
+        glbImportBtn.style.backgroundColor = '#1f2937';
+        glbImportBtn.style.borderColor = '#00f2fe';
+        glbImportBtn.style.color = '#00f2fe';
+      };
+      glbImportBtn.ondragleave = () => {
+        glbImportBtn.style.backgroundColor = '#161b22';
+        glbImportBtn.style.borderColor = '#30363d';
+        glbImportBtn.style.color = '#58a6ff';
+      };
+      glbImportBtn.ondrop = (event) => {
+        event.preventDefault();
+        glbImportBtn.style.backgroundColor = '#161b22';
+        glbImportBtn.style.borderColor = '#30363d';
+        glbImportBtn.style.color = '#58a6ff';
+        const file = event.dataTransfer.files[0];
+        if (file && (file.name.toLowerCase().endsWith('.glb') || file.name.toLowerCase().endsWith('.gltf'))) {
+          this._loadGLB(file, feedback);
+        } else {
+          feedback.textContent = 'Please drop a valid .glb file.';
+        }
+      };
+
+      const content = makeEl('div', { style: { display: 'flex', flexDirection: 'column', gap: '3px' } }, [
+        fileInput,
+        btnRandom,
+        gridDiv,
+        raycastDiv,
+        envDiv,
+        glbImportBtn,
+        feedback,
+      ]);
+
+      if (typeof UITools !== 'undefined' && typeof UITools.makeDialog === 'function') {
+        this.controlsDialog = UITools.makeDialog({
+          env: this.env,
+          title: '3D Controls',
+          contentElement: content,
+          size: [210, 265],
+          position: [14, 18],
+          onGeometryChange: (boxInstance, geometry) => {
+            if (geometry && geometry.inner) {
+              feedback.textContent = 'Size: ' + Math.round(geometry.inner.width) + ' × ' + Math.round(geometry.inner.height);
+            }
+          },
+        });
+      }
     }
-  }
-
-  _buildThickLine() {
-    if (!this.app || !this.app.modules) return;
-    const { Line2, LineGeometry, LineMaterial } = this.app.modules;
-    if (!Line2 || !LineGeometry || !LineMaterial) {
-      return;
-    }
-
-    const points = [];
-    const radius = 1.0;
-    const y = 0.55;
-    const segments = 64;
-
-    for (let i = 0; i <= segments; i++) {
-      const theta = (i / segments) * Math.PI * 2;
-      points.push(radius * Math.cos(theta), y, radius * Math.sin(theta));
-    }
-
-    const geometry = new LineGeometry();
-    geometry.setPositions(points);
-
-    const material = new LineMaterial({
-      color: 0x00f2fe,
-      linewidth: 4,
-    });
-
-    const line = new Line2(geometry, material);
-    line.computeLineDistances();
-    line.scale.set(1, 1, 1);
-    line.userData.locked = false;
-    this.app.scene.add(line);
-    this.thickLine = line;
-
-    if (this.app.renderer && this.app.renderer.domElement) {
-      const { clientWidth, clientHeight } = this.app.renderer.domElement;
-      material.resolution.set(clientWidth || 300, clientHeight || 300);
-    }
-
-    const chk = document.getElementById('thickLineToggle');
-    if (chk) {
-      this.thickLine.visible = chk.checked;
-    }
-
-    this._assignColorsRandomly();
-  }
-
   _setupRaycasting() {
     if (!this.app || !this.app.raycaster || !this.app.renderer) return;
 
@@ -285,14 +305,34 @@ class Basic3d {
     this.pointer = new THREE.Vector2();
     this.intersected = null;
 
-    const onPointerMove = (event) => {
-      if (!this.raycastingEnabled) return;
+    const toNDC = (clientX, clientY) => {
       const rect = this.app.renderer.domElement.getBoundingClientRect();
-      this.pointer.x = ((event.clientX - rect.left) / rect.width) * 2 - 1;
-      this.pointer.y = -((event.clientY - rect.top) / rect.height) * 2 + 1;
+      return new THREE.Vector2(
+        ((clientX - rect.left) / rect.width) * 2 - 1,
+        -((clientY - rect.top) / rect.height) * 2 + 1
+      );
+    };
+
+    const onPointerMove = (event) => {
+      if (!this.raycastingEnabled || event.pointerType === 'touch') return;
+      this.pointer.copy(toNDC(event.clientX, event.clientY));
+    };
+
+    const onTap = (event) => {
+      if (!this.raycastingEnabled || event.pointerType !== 'touch') return;
+      const ndc = toNDC(event.clientX, event.clientY);
+      this.app.raycaster.setFromCamera(ndc, this.app.camera);
+      const intersects = this.app.raycaster.intersectObjects(
+        this.meshes.filter((o) => o && o.visible),
+        false
+      );
+      if (intersects.length > 0) {
+        this._applyPaintToObject(intersects[0]);
+      }
     };
 
     this.app.renderer.domElement.addEventListener('pointermove', onPointerMove);
+    this.app.renderer.domElement.addEventListener('pointerdown', onTap);
 
     window.addEventListener('keydown', (e) => {
       if (e.key === 'Shift' && !this.isShiftDown) {
@@ -321,15 +361,9 @@ class Basic3d {
     }
 
     this.app.raycaster.setFromCamera(this.pointer, this.app.camera);
-    if (this.thickLine && this.app.raycaster.params && this.app.raycaster.params.Line) {
-      this.app.raycaster.params.Line.threshold = 0.02;
-    }
 
-    const objectsToTest = this.thickLine
-      ? [...this.meshes, this.thickLine]
-      : this.meshes;
     const intersects = this.app.raycaster.intersectObjects(
-      objectsToTest.filter((o) => o && o.visible),
+      this.meshes.filter((o) => o && o.visible),
       false
     );
     const newIntersect = intersects.length > 0 ? intersects[0] : null;
@@ -360,20 +394,23 @@ class Basic3d {
   }
 
   _loadGLB(file, feedbackElement) {
-    if (typeof ModelLoader !== 'undefined' && ModelLoader.loadGLB) {
-      ModelLoader.loadGLB(file, this.app, feedbackElement, (loadedModel) => {
-        this._clearSceneGeometry();
-        this.loadedModel = loadedModel;
-        this.app.add(this.loadedModel);
-        this.loadedModel.traverse((child) => {
-          if (child.isMesh) {
-            this.meshes.push(child);
+      if (typeof ModelLoader !== 'undefined' && ModelLoader.loadGLB) {
+        ModelLoader.loadGLB(file, this.app, feedbackElement, (loadedModel) => {
+          this._clearSceneGeometry();
+          this.loadedModel = loadedModel;
+          if (this.app.scene) {
+            this.app.scene.add(this.loadedModel);
+          } else if (this.app.add) {
+            this.app.add(this.loadedModel);
           }
+          this.loadedModel.traverse((child) => {
+            if (child.isMesh) {
+              this.meshes.push(child);
+            }
+          });
         });
-      });
+      }
     }
-  }
-
   _clearSceneGeometry() {
     if (typeof ModelLoader !== 'undefined' && ModelLoader.clearSceneGeometry) {
       ModelLoader.clearSceneGeometry(this.app, this.meshes, this.loadedModel);
@@ -392,70 +429,45 @@ class Basic3d {
   _applyPaintToObject(intersect) {
     const THREE = this.app.THREE;
     const object = intersect.object;
-    if (!object) return;
+    if (!object || !object.isMesh) return;
 
     object.userData.locked = true;
 
-    if (object.isLine2) {
-      const colors = this.getThemeColors();
-      const randomColor = colors[Math.floor(Math.random() * colors.length)];
-      object.material.color.copy(randomColor);
-      return;
-    }
+    const newMaterial = new THREE.MeshPhysicalMaterial({});
+    newMaterial.color.set(this._generateSaturatedColor());
+    newMaterial.metalness = 0.0;
+    newMaterial.roughness = 0.2;
+    newMaterial.clearcoat = 1.0;
+    newMaterial.clearcoatRoughness = 0.08;
 
-    if (object.isMesh) {
-      const newMaterial = new THREE.MeshPhysicalMaterial({});
-      newMaterial.color.set(this._generateSaturatedColor());
-      newMaterial.metalness = 0.1;
-      newMaterial.roughness = 0.2;
-      newMaterial.clearcoat = 0.7;
+    if (Array.isArray(object.material)) {
+      const materialIndex = intersect.face ? intersect.face.materialIndex : 0;
+      const oldMaterial = object.material[materialIndex];
+      if (oldMaterial && oldMaterial.map) newMaterial.map = oldMaterial.map;
 
-      if (Array.isArray(object.material)) {
-        const materialIndex = intersect.face ? intersect.face.materialIndex : undefined;
-        if (materialIndex !== undefined) {
-          const oldMaterial = object.material[materialIndex];
-          if (oldMaterial && oldMaterial.map) newMaterial.map = oldMaterial.map;
+      const newMaterials = object.material.slice();
+      newMaterials[materialIndex] = newMaterial;
+      object.material = newMaterials;
+      if (oldMaterial && oldMaterial.dispose) oldMaterial.dispose();
+    } else {
+      const oldMaterial = object.material;
+      if (oldMaterial && oldMaterial.map) newMaterial.map = oldMaterial.map;
 
-          const newMaterials = object.material.slice();
-          newMaterials[materialIndex] = newMaterial;
-          object.material = newMaterials;
-          if (oldMaterial && oldMaterial.dispose) oldMaterial.dispose();
-        }
-      } else {
-        const oldMaterial = object.material;
-        if (oldMaterial && oldMaterial.map) newMaterial.map = oldMaterial.map;
-
-        object.material = newMaterial;
-        if (oldMaterial && oldMaterial.dispose) oldMaterial.dispose();
-      }
+      object.material = newMaterial;
+      if (oldMaterial && oldMaterial.dispose) oldMaterial.dispose();
     }
   }
 
   _highlight(object) {
-    const THREE = this.app.THREE;
-    if (!object) return;
-
-    if (object.isMesh && object.material && object.material.emissive) {
-      object.originalEmissive = object.material.emissive.getHex();
-      object.material.emissive.setHex(0x330000);
-    } else if (object.isLine2 && object.material) {
-      object.originalColor = object.material.color.clone();
-      object.material.color.lerp(new THREE.Color(0xffffff), 0.4);
-    }
+    if (!object || !object.isMesh || !object.material || !object.material.emissive) return;
+    object.originalEmissive = object.material.emissive.getHex();
+    object.material.emissive.setHex(0x330000);
   }
 
   _unhighlight(object) {
-    if (!object) return;
-
-    if (
-      object.isMesh &&
-      object.material &&
-      object.material.emissive &&
-      object.originalEmissive !== undefined
-    ) {
+    if (!object || !object.isMesh || !object.material || !object.material.emissive) return;
+    if (object.originalEmissive !== undefined) {
       object.material.emissive.setHex(object.originalEmissive);
-    } else if (object.isLine2 && object.originalColor && object.material) {
-      object.material.color.copy(object.originalColor);
     }
   }
 
@@ -494,7 +506,6 @@ class Basic3d {
     this.app = null;
     this.meshes = [];
     this.grid = null;
-    this.thickLine = null;
     this.intersected = null;
     this.loadedModel = null;
 
@@ -561,11 +572,7 @@ class Basic3d {
 
     this.app = new ThreeJSLoader(canvasId, {
       cameraPos: { x: 1.2, y: 1.8, z: 2.8 },
-      enableControls: true,
-      useThickLines: true,
-      useRaycaster: true,
-      commonLoaders: true,
-      hdrPath: null
+      enableControls: true
     });
 
     await this.app.init(canvasContainer);
@@ -577,16 +584,12 @@ class Basic3d {
     this._buildStudioLighting();
     this._buildPrimitives();
     this._setupUI();
-    this._buildThickLine();
     this._setupRaycasting();
 
     const initialRect = parentElement.getBoundingClientRect();
     if (initialRect.width > 0 && initialRect.height > 0) {
       this.onResize(initialRect.width, initialRect.height);
     }
-
-    const THREE = this.app.getTHREE ? this.app.getTHREE() : (this.app.THREE || window.THREE);
-    this.pointer = new THREE.Vector2();
 
     window.threeApp = this.app;
     window.basic3d = this;
@@ -615,12 +618,13 @@ class Basic3d {
         this.app.resize(width, height);
       }
     }
-
-    if (this.thickLine && this.thickLine.material && this.thickLine.material.resolution) {
-      this.thickLine.material.resolution.set(width, height);
-    }
   }
 }
+
+Basic3d.ENV_MAP_URLS = [
+  'https://cdn.jsdelivr.net/gh/mrdoob/three.js@r128/examples/textures/equirectangular/venice_sunset_1k.hdr',
+  'https://raw.githubusercontent.com/mrdoob/three.js/r128/examples/textures/equirectangular/venice_sunset_1k.hdr'
+];
 
 globalThis.Basic3d = Basic3d;
 if (typeof module !== 'undefined' && module.exports) module.exports = Basic3d;

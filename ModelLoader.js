@@ -19,6 +19,14 @@ class ModelLoader {
         '',
         (gltf) => {
           const loadedModel = gltf.scene;
+
+          loadedModel.traverse((child) => {
+            if (!child.isMesh) return;
+            ModelLoader._applyPlasticMaterial(child, THREE);
+            child.castShadow = true;
+            child.receiveShadow = true;
+          });
+
           const box = new THREE.Box3().setFromObject(loadedModel);
           const size = box.getSize(new THREE.Vector3());
           const center = box.getCenter(new THREE.Vector3());
@@ -47,7 +55,6 @@ class ModelLoader {
 
     reader.readAsArrayBuffer(file);
   }
-
   static clearSceneGeometry(app, meshes, loadedModel) {
     if (loadedModel && app.scene) {
       app.scene.remove(loadedModel);
@@ -67,6 +74,27 @@ class ModelLoader {
       });
       meshes.length = 0;
     }
+  }
+
+  static _applyPlasticMaterial(mesh, THREE) {
+    const wasArray = Array.isArray(mesh.material);
+    const oldMaterials = wasArray ? mesh.material : [mesh.material];
+
+    const newMaterials = oldMaterials.map((oldMat) => {
+      const plastic = new THREE.MeshPhysicalMaterial({
+        color: oldMat && oldMat.color ? oldMat.color.clone() : new THREE.Color(0xffffff),
+        map: oldMat ? oldMat.map || null : null,
+        metalness: 0.0,
+        roughness: 0.2,
+        clearcoat: 1.0,
+        clearcoatRoughness: 0.08,
+        reflectivity: 0.9
+      });
+      if (oldMat && oldMat.dispose) oldMat.dispose();
+      return plastic;
+    });
+
+    mesh.material = wasArray ? newMaterials : newMaterials[0];
   }
 }
 
